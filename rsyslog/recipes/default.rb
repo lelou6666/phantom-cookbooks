@@ -4,11 +4,17 @@ end
 
 directory node[:rsyslog][:directory] do
   mode "0755"
+  owner node[:rsyslog][:user]
+  group node[:rsyslog][:group]
   action :create
 end
 
 template "/etc/rsyslog.d/#{node[:rsyslog][:config_priority]}-#{node[:rsyslog][:name]}.conf" do
   source "rsyslog.conf.erb"
+end
+
+template "/etc/logrotate.d/phantom" do
+  source "logrotate.erb"
 end
 
 bash "register with loggly" do

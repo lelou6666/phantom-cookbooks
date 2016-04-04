@@ -13,6 +13,17 @@ end
 retrieve_method = node[:phantomweb][:retrieve_method]
 src_dir = unpack_dir = "#{Dir.tmpdir}/PhantomWebApp"
 
+execute "Update distributed" do
+  command "easy_install -U distribute"
+end
+
+# Change ownership of /var/www to www-data
+directory "/var/www" do
+  owner "www-data"
+  group "www-data"
+  mode "0755"
+end
+
 if retrieve_method == "offline_archive"
   archive_path = "#{Dir.tmpdir}/PhantomWebApp-#{Time.now.to_i}.tar.gz"
 
@@ -52,6 +63,20 @@ end
 exe = File.join(app_dir, "phantomweb/settings.py")
 template exe do
     source "settings.py.erb"
+    variables({
+      :logging => true
+    })
+    owner node[:username]
+    group node[:groupname]
+    mode 0755
+end
+
+exe = File.join(app_dir, "phantomweb/settings_nologging.py")
+template exe do
+    source "settings.py.erb"
+    variables({
+      :logging => false
+    })
     owner node[:username]
     group node[:groupname]
     mode 0755
@@ -74,14 +99,20 @@ else
   extras = ""
 end
 
+
 if install_method == "py_venv_offline_setup"
   execute "run install" do
     cwd app_dir
-    command "env >/tmp/env ; pip install -r requirements.txt --find-links=file://#{unpack_dir}/packages/simple/ .#{extras}"
+    command "env >/tmp/env ; pip install -r requirements.txt --no-index --find-links=file://#{unpack_dir}/packages/ --upgrade .#{extras}"
   end
   execute "install-supervisor" do
     cwd app_dir
-    command "pip install --find-links=file://#{unpack_dir}/packages/simple supervisor"
+    command "pip install --no-index --find-links=file://#{unpack_dir}/packages/ supervisor"
+  end
+  execute "install-exceptional" do
+    cwd app_dir
+    command "pip install --no-index --find-links=file://#{unpack_dir}/packages/ exceptional-python"
+    not_if { node[:phantomweb][:exceptional_api_key].nil? or node[:phantomweb][:exceptional_api_key] == "" }
   end
 else
   execute "run install" do

@@ -10,9 +10,8 @@ DEBUG = <%= node[:phantomweb][:djangodebug] =%>
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
-    ('David LaBissoniere', 'priteau@ci.uchicago.edu'),
+    ('Pierre Riteau', 'priteau@ci.uchicago.edu'),
     ('Patrick Armstrong', 'patricka@uvic.ca'),
-    ('Pierre Riteau', 'labisso@uchicago.edu'),
 )
 
 EMAIL_HOST      = '<%= node[:phantomweb][:email_host] =%>'
@@ -28,7 +27,12 @@ SERVER_EMAIL    = '<%= node[:phantomweb][:email_fromaddr] =%>'
 GOOGLE_ANALYTICS_CODE='<%= node[:phantomweb][:google_analytics_code] =%>'
 EXCEPTIONAL_API_KEY='<%= node[:phantomweb][:exceptional_api_key] =%>'
 
+OPENTSDB_HOST = '<%= node[:phantomweb][:opentsdb_host] %>'
+OPENTSDB_PORT = '<%= node[:phantomweb][:opentsdb_port] %>'
+
 LOGIN_REDIRECT_URL='/phantom'
+
+TOKEN_TIMEOUT_DAYS = 365
 
 MANAGERS = ADMINS
 
@@ -42,6 +46,11 @@ DATABASES = {
         'PORT': '<%= node[:phantomweb][:mysql_port] =%>',
     }
 }
+
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+    'tokenapi.backends.TokenBackend'
+)
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -120,6 +129,7 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'django_statsd.middleware.TimingMiddleware',
     # Uncomment the next line for simple clickjacking protection:
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
@@ -146,9 +156,12 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.admindocs',
     'django.contrib.admindocs',
+    'django_statsd',
     'phantomweb',
+    'tokenapi',
 )
 
+<% if @logging -%>
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -166,6 +179,15 @@ LOGGING = {
         },
     },
     'handlers': {
+    <% if ! node[:phantomweb][:exceptional_api_key].nil? and node[:phantomweb][:exceptional_api_key] != "" -%>
+        'exceptional': {
+            'append_log_messages': True,
+            'class': 'exceptional.ExceptionalLogHandler',
+            'level': 'ERROR',
+            'api_key': '<%= node[:phantomweb][:exceptional_api_key] =%>',
+            'environment': False
+        },
+        <% end -%>
         'default': {
             'level':'DEBUG',
             'class':'logging.handlers.RotatingFileHandler',
@@ -202,6 +224,9 @@ LOGGING = {
 
         'phantomweb.general': {               # define another logger
             'handlers': [
+            <% if ! node[:phantomweb][:exceptional_api_key].nil? and node[:phantomweb][:exceptional_api_key] != "" -%>
+                'exceptional',
+                <% end -%>
                 'file_general'
             ],  # associate a different handler
             'level': 'DEBUG',                 # specify the logging level
@@ -210,3 +235,4 @@ LOGGING = {
     }
 }
 
+<% end -%>

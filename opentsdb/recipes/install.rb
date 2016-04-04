@@ -8,7 +8,7 @@ end
 script "Extract OpenTSDB" do
   interpreter "bash"
   code <<-EOH
-  git clone #{node[:opentsdb][:git_url]} opentsdb
+  git clone #{node[:opentsdb][:git_url]} opentsdb --depth 1
   EOH
   cwd "/opt"
 end
@@ -36,12 +36,18 @@ execute "Create HBase Tables" do
   environment ({'COMPRESSION' => 'none', 'HBASE_HOME' => node[:hbase][:location]})
 end
 
-directory "/tmp/tsd" do
+directory node[:opentsdb][:cachedir] do
   action :create
+end
+
+cron "clear_tsd_cache" do
+  action :create
+  minute "*/15"
+  command %Q{ cd #{node[:opentsdb][:cachedir]} && find . -name "*" -print0 | xargs -0 rm }
 end
 
 bash "Start TSD" do
   code <<-EOH
-  tsdb tsd --port=#{node[:opentsdb][:port]} --staticroot=/usr/local/share/opentsdb/static --cachedir=/tmp/tsd --auto-metric &
+  tsdb tsd --port=#{node[:opentsdb][:port]} --staticroot=/usr/local/share/opentsdb/static --cachedir=#{node[:opentsdb][:cachedir]} --auto-metric &
   EOH
 end
